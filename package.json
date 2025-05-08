@@ -11,10 +11,12 @@
   "dependencies": {
     "@pinecone-database/pinecone": "^5.1.2",
     "gpt-tokenizer": "^2.9.0",
+    "langchain": "^0.3.24",
     "next": "15.3.1",
     "openai": "^4.96.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

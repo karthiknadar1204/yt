@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import OpenAI from 'openai';
+import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 
 const openai = new OpenAI({
-
-
+  apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true
 });
 
 interface ChunkWithEmbedding {
@@ -45,58 +46,27 @@ export default function Home() {
     }
   };
 
-  const chunkText = (text: string, chunkSize: number = 4000, overlapSize: number = 500) => {
-    const chunks: string[] = [];
-    let currentChunk = '';
-    let currentSize = 0;
-    let lastSentenceEnd = 0;
-
-    // Split text into sentences to avoid breaking in the middle of a sentence
-    const sentences = text.split(/(?<=[.!?])\s+/);
-
-    for (let i = 0; i < sentences.length; i++) {
-      const sentence = sentences[i];
-      
-      if (currentSize + sentence.length > chunkSize) {
-        if (currentChunk) {
-          // Add the current chunk
-          chunks.push(currentChunk.trim());
-          
-          // Start new chunk with overlap
-          currentChunk = '';
-          currentSize = 0;
-          
-          // Go back to find the overlap point
-          let overlapText = '';
-          let overlapSize = 0;
-          for (let j = i - 1; j >= 0; j--) {
-            if (overlapSize + sentences[j].length > overlapSize) {
-              break;
-            }
-            overlapText = sentences[j] + ' ' + overlapText;
-            overlapSize += sentences[j].length;
-          }
-          
-          currentChunk = overlapText;
-          currentSize = overlapSize;
-        }
-      }
-      
-      currentChunk += sentence + ' ';
-      currentSize += sentence.length;
-    }
-
-    if (currentChunk) {
-      chunks.push(currentChunk.trim());
-    }
-
-    console.log('Created chunks with overlap:', {
-      totalChunks: chunks.length,
-      chunkSizes: chunks.map(chunk => chunk.length),
-      sampleChunks: chunks.slice(0, 2).map(chunk => chunk.substring(0, 100) + '...')
+  const chunkText = async (text: string, chunkSize: number = 4000, overlapSize: number = 500) => {
+    const splitter = new RecursiveCharacterTextSplitter({
+      chunkSize: chunkSize,
+      chunkOverlap: overlapSize,
     });
 
-    return chunks;
+    try {
+      const documents = await splitter.createDocuments([text]);
+      const chunks = documents.map(doc => doc.pageContent);
+
+      console.log('Created chunks with LangChain RecursiveCharacterTextSplitter:', {
+        totalChunks: chunks.length,
+        chunkSizes: chunks.map(chunk => chunk.length),
+        sampleChunks: chunks.slice(0, 2).map(chunk => chunk.substring(0, 100) + '...')
+      });
+
+      return chunks;
+    } catch (error) {
+      console.error('Error chunking text:', error);
+      throw error;
+    }
   };
 
   const getEmbeddings = async (texts: string[]) => {
@@ -241,42 +211,75 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     setError('');
     setTranscript('');
     setChunks([]);
-    setCurrentChunk(0);
-    setIsLoading(true);
-    setProcessingStatus(null);
-
-    const videoId = extractVideoId(url);
-    if (!videoId) {
-      setError('Invalid YouTube URL');
-      setIsLoading(false);
-      return;
-    }
+    setSearchResults([]);
+    setFormattedResults('');
 
     try {
+      // Extract video ID
+      const videoId = extractVideoId(url);
+      if (!videoId) {
+        throw new Error('Invalid YouTube URL');
+      }
+
+      // Fetch transcript from Strapi
       const response = await fetch(`https://deserving-harmony-9f5ca04daf.strapiapp.com/utilai/yt-transcript/${videoId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch transcript');
+        throw new Error(`Failed to fetch transcript: ${response.statusText}`);
       }
+      
       const data = await response.text();
       setTranscript(data);
-      
-      const textChunks = chunkText(data);
-      const embeddings = await getEmbeddings(textChunks);
-      
-      const chunksWithEmbeddings = textChunks.map((text, index) => ({
-        text,
-        embedding: embeddings[index],
-        id: `chunk-${videoId}-${index}`
-      }));
-      
+
+      // Process chunks in batches using LangChain's RecursiveCharacterTextSplitter
+      const textChunks = await chunkText(data);
+      const totalChunks = textChunks.length;
+      const batchSize = 5;
+      const totalBatches = Math.ceil(totalChunks / batchSize);
+
+      setProcessingStatus({
+        totalChunks,
+        processedChunks: 0,
+        currentBatch: 1,
+        totalBatches,
+        status: 'processing'
+      });
+
+      const chunksWithEmbeddings: ChunkWithEmbedding[] = [];
+
+      for (let i = 0; i < totalChunks; i += batchSize) {
+        const batch = textChunks.slice(i, i + batchSize);
+        const embeddings = await getEmbeddings(batch);
+
+        for (let j = 0; j < batch.length; j++) {
+          chunksWithEmbeddings.push({
+            text: batch[j],
+            embedding: embeddings[j],
+            id: `chunk-${videoId}-${i + j}`
+          });
+        }
+
+        setProcessingStatus(prev => prev ? {
+          ...prev,
+          processedChunks: Math.min(i + batch.length, totalChunks),
+          currentBatch: Math.floor((i + batch.length) / batchSize) + 1
+        } : null);
+      }
+
       setChunks(chunksWithEmbeddings);
       await storeInPinecone(chunksWithEmbeddings);
-    } catch (err) {
-      setError('Failed to process transcript');
-      console.error(err);
+
+      setProcessingStatus(prev => prev ? {
+        ...prev,
+        status: 'completed'
+      } : null);
+
+    } catch (err: any) {
+      console.error('Error:', err);
+      setError(err.message || 'An error occurred');
     } finally {
       setIsLoading(false);
     }
