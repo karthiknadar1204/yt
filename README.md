@@ -2,6 +2,13 @@
 
 > **Note:** This project is still a work in progress. I built it during the duration of my finals, so there's a fair amount of ad-hoc code. I’m currently working on splitting the codebase into more modular components and fine-tuning the application for better performance and usability. **Contributions and feedback are welcome!**
 
+<img width="1788" alt="Screenshot 2025-05-09 at 10 38 55 AM" src="https://github.com/user-attachments/assets/ed5e1e17-164e-4546-a103-8b7d249a257c" />
+
+
+
+
+
+
 **YT Chat** is a Next.js TypeScript application that allows users to interact with YouTube videos through a conversational interface. Powered by **Pinecone** for vector storage, **Grok LLM (via xAI)** for conversational AI, and **OpenAI embeddings** for semantic understanding, this app enables users to ask questions about video content and receive meaningful responses.
 
 ---
