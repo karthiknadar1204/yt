@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@langchain/textsplitters": "^0.1.0",
     "@pinecone-database/pinecone": "^5.1.2",
     "gpt-tokenizer": "^2.9.0",
     "langchain": "^0.3.24",
@@ -16,7 +17,8 @@
     "openai": "^4.96.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zustand": "^5.0.3"
+    "zod": "^3.24.4",
+    "zustand": "^5.0.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -24,6 +26,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
+    "tw-animate-css": "^1.2.9",
     "typescript": "^5"
   }
 }
