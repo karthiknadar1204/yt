@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     Format the response in markdown for better readability.`;
 
     const completion = await client.chat.completions.create({
-      model: "grok-3-beta",
+      model: "grok-3-mini-fast",
       messages: [
         { role: "system", content: systemPrompt },
         { 
